@@ -198,3 +198,61 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
     return results
+
+
+# Perform inference using a "nop" model that expects some form or
+# zero-sized input/output tensor.
+def infer_zero(tester, pf, batch_size, tensor_dtype, tensor_shape,
+               model_version=None, use_http=True, use_grpc=True,
+               use_streaming=True):
+    # shape must be [] since that is what the model expects
+    tester.assertTrue(len(tensor_shape) == 0,
+                      "Expected zero-shape tensor, got [{}]".format(
+                          tu.shape_to_dims_str(tensor_shape)))
+
+    tester.assertTrue(use_http or use_grpc or use_streaming)
+    configs = []
+    if use_http:
+        configs.append(("localhost:8000", ProtocolType.HTTP, False))
+    if use_grpc:
+        configs.append(("localhost:8001", ProtocolType.GRPC, False))
+    if use_streaming:
+        configs.append(("localhost:8001", ProtocolType.GRPC, True))
+
+    for config in configs:
+        model_name = tu.get_model_name(pf, tensor_dtype, tensor_dtype, tensor_dtype)
+
+        # The entire input tensor batch has shape [ batch-size ], so
+        # each tensor in the batch has shape [ 1 ].
+        input0_list = list()
+        expected0_list = list()
+        for b in range(batch_size):
+            rtensor_dtype = _range_repr_dtype(tensor_dtype)
+            in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                    high=np.iinfo(rtensor_dtype).max,
+                                    size=[1,], dtype=rtensor_dtype)
+            in0 = in0.astype(tensor_dtype)
+            input0_list.append(in0)
+            expected0_list.append(np.ndarray.copy(in0))
+
+        ctx = InferContext(config[0], config[1], model_name, model_version,
+                           correlation_id=0, streaming=config[2],
+                           verbose=True)
+        results = ctx.run(
+            { "INPUT" : input0_list },
+            { "OUTPUT" : InferContext.ResultFormat.RAW },
+            batch_size)
+
+        tester.assertEqual(ctx.get_last_request_model_name(), model_name)
+        if model_version is not None:
+            tester.assertEqual(ctx.get_last_request_model_version(), model_version)
+
+        tester.assertEqual(len(results), 1)
+        for (result_name, result_val) in iteritems(results):
+            for b in range(batch_size):
+                tester.assertEqual(result_name, "OUTPUT")
+                tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
+                                  "{}, OUTPUT expected: {}, got {}".format(
+                                      model_name, expected0_list[b], result_val[b]))
+
+    return results
