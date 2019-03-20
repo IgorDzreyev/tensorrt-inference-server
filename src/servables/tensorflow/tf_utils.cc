@@ -57,12 +57,34 @@ CompareDimsExact(
 bool
 CompareDimsSupported(
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
-    const bool supports_batching)
+    const bool supports_batching, std::string* msg)
 {
-  // If the model configuration expects batching support in the model,
-  // then the tensorflow shape first dimension must be -1.
+  msg->clear();
+
   if (supports_batching) {
+    // If the model configuration expects batching support in the model,
+    // then the tensorflow shape first dimension must be -1.
     if ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1)) {
+      return false;
+    }
+
+    // If the model configuration expects batching support and the
+    // model itself has an input shape that is only the batch
+    // dimension, then in the configuration expect the tensor to have
+    // shape [ 1 ]. This is the case where TF is expecting the entire
+    // input batch to be a vector with shape [ batch-size ], but in
+    // the model config we want to explicitly show that each input is
+    // size [ 1 ]. So requests will be shape [ batch-size, 1 ] but the
+    // RequestProvider will fix the input shape to be just [
+    // batch-size ] as expected by the model.
+    if (model_shape.dim().size() == 1) {
+      if ((dims.size() == 1) && (dims[0] == 1)) {
+        return true;
+      }
+
+      *msg =
+          "has shape [ ] in the model and so must have shape [1] in the model "
+          "configuration";
       return false;
     }
   }

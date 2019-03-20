@@ -52,9 +52,11 @@ bool CompareDimsExact(
 /// \param supports_batching If True then the configuration expects
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
+/// \param msg If non-empty returns a custom message to use instead of
+/// standard failure message.
 bool CompareDimsSupported(
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
-    const bool supports_batching);
+    const bool supports_batching, std::string* msg);
 
 /// \return true if a TensorFlow data-type matches a model
 /// configuration data-type.

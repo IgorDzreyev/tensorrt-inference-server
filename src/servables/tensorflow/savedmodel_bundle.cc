@@ -123,14 +123,23 @@ SavedModelBundle::CreateSession(
           "unexpected inference input '" + io.name() + "'");
     }
 
+    std::string custom_msg;
     if (!CompareDimsSupported(
             iitr->second.tensor_shape(), io.dims(),
-            Config().max_batch_size() > 0)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', input '" + io.name() +
-              "' dims " + DimsDebugString(iitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsListToString(io.dims()));
+            Config().max_batch_size() > 0, &custom_msg)) {
+      if (custom_msg.empty()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unable to load model '" + Name() + "', input '" + io.name() +
+                "' dims " + DimsDebugString(iitr->second.tensor_shape()) +
+                " don't match configuration dims " +
+                DimsListToString(io.dims()));
+      } else {
+        return Status(
+            RequestStatusCode::INVALID_ARG, "unable to load model '" + Name() +
+                                                "', input '" + io.name() +
+                                                "' " + custom_msg);
+      }
     }
     if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
       return Status(
@@ -152,14 +161,23 @@ SavedModelBundle::CreateSession(
           "unexpected inference output '" + io.name() + "'");
     }
 
+    std::string custom_msg;
     if (!CompareDimsSupported(
             oitr->second.tensor_shape(), io.dims(),
-            Config().max_batch_size() > 0)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', output '" + io.name() +
-              "' dims " + DimsDebugString(oitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsListToString(io.dims()));
+            Config().max_batch_size() > 0, &custom_msg)) {
+      if (custom_msg.empty()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unable to load model '" + Name() + "', output '" + io.name() +
+                "' dims " + DimsDebugString(oitr->second.tensor_shape()) +
+                " don't match configuration dims " +
+                DimsListToString(io.dims()));
+      } else {
+        return Status(
+            RequestStatusCode::INVALID_ARG, "unable to load model '" + Name() +
+                                                "', output '" + io.name() +
+                                                "' " + custom_msg);
+      }
     }
     if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
       return Status(
